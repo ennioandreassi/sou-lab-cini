@@ -1,0 +1,98 @@
+---
+# tasks file for sou_podman
+    - name: install podman
+      yum:
+        name: podman
+        state: latest
+#    - name: disable selinux
+#      lineinfile:
+#        path: /etc/selinux/config
+#        regexp: '^SELINUX='
+#        line: SELINUX=disabled
+    - name: create dir
+      file:
+       path: /vagrant/containers_dir
+       state: directory
+       owner: vagrant
+       group: vagrant
+       mode: '0755'
+      become: false
+      when: inventory_hostname == 'soufe1'
+    - name: template
+      template:
+        src: haproxy.j2
+        dest: /vagrant/containers_dir/haproxy.cfg
+        owner: vagrant
+        group: vagrant
+      when: inventory_hostname == 'soufe1'
+      become: false
+        #notify:
+        # - reload_haproxy
+    - name: open port firewall
+      firewalld:
+        port: "{{item}}"
+        permanent: true
+        state: enabled
+        immediate: true
+      loop:
+        - 80/tcp
+        - 8080/tcp
+        - 9090/tcp
+        - 3000/tcp
+    - name: Add a line to sysctl
+      ansible.builtin.lineinfile:
+        path: /etc/sysctl.conf
+        line: "net.ipv4.ip_unprivileged_port_start=80"
+    - name: Create Prometheus data dir
+      ansible.builtin.file:
+        path: /containers_vols/prometheus/data
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: '0755'
+      when: " inventory_hostname == 'soube2'"
+    - name: template prometheus
+      template:
+        src: prometheus.j2
+        dest: /containers_vols/prometheus/data/prometheus.yml
+        owner: vagrant
+        group: vagrant
+        mode: '0666'
+      when: " inventory_hostname == 'soube2'"
+    - name: Create Prometheus Container
+      containers.podman.podman_container:
+        name: prometheus
+        image: docker.io/prom/prometheus
+          #subuidname: 65536
+        volume:
+          - /containers_vols/prometheus/data/prometheus.yml:/etc/prometheus/prometheus.yml:z
+            # - /containers_vols/prometheus/data:/prometheus:z
+        expose:
+          - 9090
+        ports:
+          - "9090:9090"
+      when: " inventory_hostname == 'soube2'"
+      become: false
+    - name: create Grafana container
+      containers.podman.podman_container:
+        name: grafana
+        image: docker.io/grafana/grafana-enterprise
+        expose:
+          - 3000
+        ports:
+          - "3000:3000"
+      when: " inventory_hostname == 'soube2'"
+      become: false
+
+    - name: install haproxy with podman
+      containers.podman.podman_container:
+        name: haproxy
+        image: docker.io/library/haproxy
+        expose:
+          - "8080"
+        ports:
+          - "8080:8080"
+        volume:
+          - /vagrant/containers_dir/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg
+      when: inventory_hostname == 'soufe1'
+      become: false

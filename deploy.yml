@@ -1,0 +1,6 @@
+---
+- name: deploy
+  become: true
+  hosts: all
+  roles:
+    - sou_podman
