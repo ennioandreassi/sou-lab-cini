@@ -18,7 +18,7 @@
        mode: '0755'
       become: false
       when: inventory_hostname == 'soufe1'
-    - name: template
+    - name: template haproxy
       template:
         src: haproxy.j2
         dest: /vagrant/containers_dir/haproxy.cfg
@@ -84,7 +84,7 @@
       when: " inventory_hostname == 'soube2'"
       become: false
 
-    - name: install haproxy with podman
+    - name: create haproxy container
       containers.podman.podman_container:
         name: haproxy
         image: docker.io/library/haproxy
